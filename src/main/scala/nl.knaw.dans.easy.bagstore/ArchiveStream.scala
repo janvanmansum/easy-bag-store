@@ -60,9 +60,9 @@ class ArchiveStream(streamType: ArchiveStreamType, files: Seq[EntrySpec]) {
    * @return
    */
   def writeTo(outputStream: => OutputStream): Try[Unit] = {
-    createArchiveOutputStream(outputStream).map(_.acquireAndGet { tarStream =>
-      files.foreach(addFileToTarStream(tarStream))
-      tarStream.finish()
+    createArchiveOutputStream(outputStream).map(_.acquireAndGet { aos =>
+      files.foreach(addFileToArchiveOutputStream(aos))
+      aos.finish()
     })
   }
 
@@ -70,7 +70,7 @@ class ArchiveStream(streamType: ArchiveStreamType, files: Seq[EntrySpec]) {
     resource.managed(new ArchiveStreamFactory("UTF-8").createArchiveOutputStream(streamType, output))
   }
 
-  private def addFileToTarStream(os: ArchiveOutputStream)(entrySpec: EntrySpec): Try[Unit] = Try {
+  private def addFileToArchiveOutputStream(os: ArchiveOutputStream)(entrySpec: EntrySpec): Try[Unit] = Try {
     val entry = os.createArchiveEntry(entrySpec.sourcePath.map(_.toFile).orNull, entrySpec.entryPath)
     os.putArchiveEntry(entry)
     entrySpec.sourcePath.foreach { case file if Files.isRegularFile(file) => Files.copy(file, os) }

@@ -17,28 +17,37 @@ package nl.knaw.dans.easy.bagstore
 
 import java.io.OutputStream
 
+/**
+ * Wraps another output stream and crops its input. "Cropping" here means cutting off parts of the beginning and/or
+ * the end, similar to cropping an image.
+ *
+ * @param os the wrapped output stream
+ * @param skipLength the number of bytes to cut off the beginning of data
+ * @param totalLengthToWrite total length to write before cutting off the end
+ */
 class CroppingOutputStream(os: OutputStream, skipLength: Long, totalLengthToWrite: Long) extends OutputStream {
   private var received = 0L
   private var written = 0L
 
   override def write(b: Int): Unit = {
-    if (skipLength < received) {
+    if (received >= skipLength && written < totalLengthToWrite) {
       os.write(b)
       written += 1
     }
     received += 1
   }
 
-  override def write(b: Array[Byte]): Unit = {
-    write(b, 0, b.length)
-  }
-
   override def write(b: Array[Byte], off: Int, len: Int): Unit = {
-    val startPosInBufferPart = Math.min(Math.max(skipLength - received, 0), b.length - len - 1)
-    val nBytesToWrite = Math.min(totalLengthToWrite - written, len - startPosInBufferPart)
-    os.write(b, off + startPosInBufferPart.toInt, nBytesToWrite.toInt)
-    received += b.length
-    written += nBytesToWrite
+    // Copied the checks on bounds from java.io.OutputStream
+    if (off < 0 || off > b.length || len < 0 || off + len > b.length || off + len < 0) throw new IndexOutOfBoundsException
+    val startPosInBufferPart = Math.max(skipLength - received, 0)
+    val startPosInBuffer = off + startPosInBufferPart
+    val nBytesToWrite = Math.min(len, Math.min(totalLengthToWrite - written, b.length - startPosInBuffer + 1))
+    if (startPosInBuffer < b.length) {
+      os.write(b, startPosInBuffer.toInt, nBytesToWrite.toInt)
+      written += nBytesToWrite
+    }
+    received += len
   }
 
   override def close(): Unit = os.close()
