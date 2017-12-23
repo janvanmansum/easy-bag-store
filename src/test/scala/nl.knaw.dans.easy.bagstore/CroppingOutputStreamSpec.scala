@@ -16,6 +16,7 @@
 package nl.knaw.dans.easy.bagstore
 
 import java.io.{ ByteArrayOutputStream, OutputStream }
+import java.lang.IndexOutOfBoundsException
 
 import org.scalatest.{ FlatSpec, Matchers }
 
@@ -133,5 +134,27 @@ class CroppingOutputStreamSpec extends FlatSpec with Matchers {
     output.toString should be ("uvw")
   }
 
+  it should "throw an exception with negative offset" in {
+    val output = new ByteArrayOutputStream()
+    val cos = new CroppingOutputStream(output, 17, 3)
+    an [IndexOutOfBoundsException] should be thrownBy cos.write(alphabetBuffer, -1, 2)
+  }
 
+  it should "throw an exception with too large length" in {
+    val output = new ByteArrayOutputStream()
+    val cos = new CroppingOutputStream(output, 17, 3)
+    an [IndexOutOfBoundsException] should be thrownBy cos.write(alphabetBuffer, 0, 27)
+  }
+
+  it should "throw an exception with too large length + offset" in {
+    val output = new ByteArrayOutputStream()
+    val cos = new CroppingOutputStream(output, 17, 3)
+    an [IndexOutOfBoundsException] should be thrownBy cos.write(alphabetBuffer, 5, 22)
+  }
+
+  it should "throw an exception with negative length" in {
+    val output = new ByteArrayOutputStream()
+    val cos = new CroppingOutputStream(output, 17, 3)
+    an [IndexOutOfBoundsException] should be thrownBy cos.write(alphabetBuffer, 0, -1)
+  }
 }

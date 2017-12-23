@@ -23,14 +23,14 @@ import java.io.OutputStream
  *
  * @param os the wrapped output stream
  * @param skipLength the number of bytes to cut off the beginning of data
- * @param totalLengthToWrite total length to write before cutting off the end
+ * @param maxLength maximum length to write before cutting off the end
  */
-class CroppingOutputStream(os: OutputStream, skipLength: Long, totalLengthToWrite: Long) extends OutputStream {
+class CroppingOutputStream(os: OutputStream, skipLength: Long, maxLength: Long) extends OutputStream {
   private var received = 0L
   private var written = 0L
 
   override def write(b: Int): Unit = {
-    if (received >= skipLength && written < totalLengthToWrite) {
+    if (received >= skipLength && written < maxLength) {
       os.write(b)
       written += 1
     }
@@ -42,7 +42,7 @@ class CroppingOutputStream(os: OutputStream, skipLength: Long, totalLengthToWrit
     if (off < 0 || off > b.length || len < 0 || off + len > b.length || off + len < 0) throw new IndexOutOfBoundsException
     val startPosInBufferPart = Math.max(skipLength - received, 0)
     val startPosInBuffer = off + startPosInBufferPart
-    val nBytesToWrite = Math.min(len, Math.min(totalLengthToWrite - written, b.length - startPosInBuffer + 1))
+    val nBytesToWrite = Math.min(len, Math.min(maxLength - written, b.length - startPosInBuffer + 1))
     if (startPosInBuffer < b.length) {
       os.write(b, startPosInBuffer.toInt, nBytesToWrite.toInt)
       written += nBytesToWrite
