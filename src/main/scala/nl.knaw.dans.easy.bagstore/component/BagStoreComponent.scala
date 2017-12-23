@@ -173,8 +173,12 @@ trait BagStoreComponent {
             }
           }
           allEntries <- Try { (dirSpecs ++ fileSpecs).sortBy(_.entryPath) }
+          // TODO: only get subseq for tar, in other cases subseq = allentries
+          entriesToStream <- Try { allEntries }
+//          entriesToStream <- getSubSeqOfTarEntries(allEntries, startByte, endByte)
+//          offsetIntoFirstFile <- allEntries.takeWhile(!entriesToStream.contains(_)).map(getTarEntrySize).collectResults.map(startByte - _.sum)
           _ <- archiveStreamType.map { st =>
-            new ArchiveStream(st, allEntries).writeTo(outputStream)
+            new ArchiveStream(st, entriesToStream).writeTo(new CroppingOutputStream(outputStream, 0, Long.MaxValue))
           }.getOrElse {
             if (allEntries.size == 1) Try {
               fileSystem.toRealLocation(fileIds.head)
