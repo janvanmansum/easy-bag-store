@@ -22,7 +22,7 @@ import org.apache.commons.compress.archivers.{ ArchiveOutputStream, ArchiveStrea
 import resource.ManagedResource
 
 import scala.language.implicitConversions
-import scala.util.Try
+import scala.util.{ Failure, Try }
 
 object ArchiveStreamType extends Enumeration {
   type ArchiveStreamType = Value
@@ -34,10 +34,10 @@ import nl.knaw.dans.easy.bagstore.ArchiveStreamType._
 /**
  * Specification for an entry in the archive file.
  *
- * @param sourcePath  optional path to an existing file or directory, if None a directory entry will be created
+ * @param sourceDataPath  optional path to an existing file or directory, if None a directory entry will be created
  * @param entryPath the path of the entry in the archive file
  */
-case class EntrySpec(sourcePath: Option[Path], entryPath: String)
+case class EntrySpec(sourceDataPath: Option[Path], entryPath: String)
 
 /**
  * Object representing a TAR ball, providing a function to write it to an output stream.
@@ -71,9 +71,12 @@ class ArchiveStream(streamType: ArchiveStreamType, files: Seq[EntrySpec]) {
   }
 
   private def addFileToTarStream(os: ArchiveOutputStream)(entrySpec: EntrySpec): Try[Unit] = Try {
-    val entry = os.createArchiveEntry(entrySpec.sourcePath.map(_.toFile).orNull, entrySpec.entryPath)
+    val entry = os.createArchiveEntry(entrySpec.sourceDataPath.map(_.toFile).orNull, entrySpec.entryPath)
     os.putArchiveEntry(entry)
-    entrySpec.sourcePath.foreach { case file if Files.isRegularFile(file) => Files.copy(file, os) }
+    entrySpec.sourceDataPath.foreach { case file if Files.isRegularFile(file) => Files.copy(file, os) }
     os.closeArchiveEntry()
   }
 }
+
+
+

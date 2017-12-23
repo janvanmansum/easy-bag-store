@@ -151,7 +151,7 @@ trait BagStoreComponent {
      * @param outputStream      the output stream to write to
      * @return whether the call was successful
      */
-    def copyToStream(itemId: ItemId, archiveStreamType: Option[ArchiveStreamType], outputStream: => OutputStream): Try[Unit] = {
+    def copyToStream(itemId: ItemId, archiveStreamType: Option[ArchiveStreamType], outputStream: => OutputStream, startByte: Long = 0, endByte: Long = Long.MaxValue): Try[Unit] = {
       trace(itemId)
       val bagId = BagId(itemId.uuid)
 
@@ -173,8 +173,11 @@ trait BagStoreComponent {
             }
           }
           allEntries <- Try { (dirSpecs ++ fileSpecs).sortBy(_.entryPath) }
+          // TODO: only get subseq for tar, in other cases subseq = allentries
+          entriesToStream <- getSubSeqOfTarEntries(allEntries, startByte, endByte)
+          offsetIntoFirstFile <- allEntries.takeWhile(!entriesToStream.contains(_)).map(getTarEntrySize).collectResults.map(startByte - _.sum)
           _ <- archiveStreamType.map { st =>
-            new ArchiveStream(st, allEntries).writeTo(outputStream)
+            new ArchiveStream(st, entriesToStream).writeTo(new CroppingOutputStream(outputStream, offsetIntoFirstFile, endByte - startByte))
           }.getOrElse {
             if (allEntries.size == 1) Try {
               fileSystem.toRealLocation(fileIds.head)
@@ -190,9 +193,29 @@ trait BagStoreComponent {
       }
     }
 
+    private def getSubSeqOfTarEntries(entries: Seq[EntrySpec], startByte: Long, endByte: Long): Try[Seq[EntrySpec]] = Try {
+      getTarEntryPositions(entries)
+        .sliding(2)
+        .map { case List((p1, pos1), (p2, pos2)) => (p1, pos1, pos2) }
+        .filter { case (_, _, end) => end > startByte }
+        .takeWhile { case (_, start, _) => start < endByte }
+        .map { case (p, _, _) => p }.toList
+    }
+
+    private def getTarEntryPositions(entries: Seq[EntrySpec]): Seq[(EntrySpec, Long)] = {
+      val TAR_RECORD_LENGTH = 512
+      entries.zip(
+        entries.toStream.scanLeft(0L) {
+          case (pos: Long, entry: EntrySpec) =>
+            getTarEntrySize(entry).map(_ + pos).get
+        })
+    }
+
     private def createEntrySpec(source: Option[Path], bagDir: Path, itemPath: Path, fileId: FileId): EntrySpec = {
       if (itemPath == bagDir) EntrySpec(source, Paths.get(bagDir.getFileName.toString, fileId.path.toString).toString)
-      else EntrySpec(source, Paths.get(itemPath.getFileName.toString, bagDir.relativize(itemPath).relativize(fileId.path).toString).toString)
+      else EntrySpec(source,
+        Paths.get(itemPath.getFileName.toString,
+          bagDir.relativize(itemPath).relativize(fileId.path).toString).toString)
     }
 
     def add(bagDir: Path, uuid: Option[UUID] = None, skipStage: Boolean = false): Try[BagId] = {

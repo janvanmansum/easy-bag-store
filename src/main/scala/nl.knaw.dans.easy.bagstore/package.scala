@@ -52,6 +52,8 @@ package object bagstore {
 
   type BaseDir = Path
 
+  val TAR_RECORD_LENGTH = 512
+
   def pathsEqual(f1: Path, f2: Path, excludeFiles: String*): Boolean = {
 
     @tailrec
@@ -144,5 +146,12 @@ package object bagstore {
       list += path.subpath(0, i)
     }
     list.toSet
+  }
+
+  def getTarEntrySize(entrySpec: EntrySpec): Try[Long] = Try {
+    val fileSize = entrySpec.sourceDataPath.map(Files.size).getOrElse(0L)
+    val nRecords = fileSize / TAR_RECORD_LENGTH + 1 + (if (fileSize % TAR_RECORD_LENGTH == 0) 0
+                                                       else 1)
+    nRecords * TAR_RECORD_LENGTH
   }
 }
