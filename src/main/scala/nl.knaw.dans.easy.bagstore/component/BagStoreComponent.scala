@@ -151,7 +151,7 @@ trait BagStoreComponent {
      * @param outputStream      the output stream to write to
      * @return whether the call was successful
      */
-    def copyToStream(itemId: ItemId, archiveStreamType: Option[ArchiveStreamType], outputStream: => OutputStream): Try[Unit] = {
+    def copyToStream(itemId: ItemId, archiveStreamType: Option[ArchiveStreamType], outputStream: => OutputStream, startByte: Long = 0, endByte: Option[Long] = None): Try[Unit] = {
       trace(itemId)
       val bagId = BagId(itemId.uuid)
 
@@ -174,11 +174,10 @@ trait BagStoreComponent {
           }
           allEntries <- Try { (dirSpecs ++ fileSpecs).sortBy(_.entryPath) }
           // TODO: only get subseq for tar, in other cases subseq = allentries
-          entriesToStream <- Try { allEntries }
-//          entriesToStream <- getSubSeqOfTarEntries(allEntries, startByte, endByte)
-//          offsetIntoFirstFile <- allEntries.takeWhile(!entriesToStream.contains(_)).map(getTarEntrySize).collectResults.map(startByte - _.sum)
+          range <- Try { TarRange(allEntries, startByte, endByte) }
           _ <- archiveStreamType.map { st =>
-            new ArchiveStream(st, entriesToStream).writeTo(new CroppingOutputStream(outputStream, 0, Long.MaxValue))
+            debug(s"Writing overlapping entries (offset = ${range.offsetIntoFirstEntry}, totalLength = ${range.totalLength}): ${range.overlappingEntries}")
+            new ArchiveStream(st, range.overlappingEntries).writeTo(new CroppingOutputStream(outputStream, range.offsetIntoFirstEntry, range.totalLength))
           }.getOrElse {
             if (allEntries.size == 1) Try {
               fileSystem.toRealLocation(fileIds.head)
