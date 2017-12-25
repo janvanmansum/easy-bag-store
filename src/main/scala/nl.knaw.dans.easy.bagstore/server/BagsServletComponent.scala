@@ -46,6 +46,7 @@ trait BagsServletComponent extends DebugEnhancedLogging {
     get("/:uuid") {
       val uuidStr = params("uuid")
       val accept = request.getHeader("Accept")
+      val (startByte, optEndByte) = translateRangeHeader(request.getHeader("Range"))
       ItemId.fromString(uuidStr)
         .recoverWith {
           case _: IllegalArgumentException => Failure(new IllegalArgumentException(s"invalid UUID string: $uuidStr"))
@@ -56,7 +57,7 @@ trait BagsServletComponent extends DebugEnhancedLogging {
             .enumFiles(bagId, includeDirectories = false)
             .map(files => Ok(files.toList.mkString("\n")))
           else bagStores
-            .copyToStream(bagId, accept, response.outputStream)
+            .copyToStream(bagId, accept, response.outputStream, None, startByte, optEndByte)
             .map(_ => Ok())
         })
         .getOrRecover {
@@ -71,6 +72,8 @@ trait BagsServletComponent extends DebugEnhancedLogging {
 
     get("/:uuid/*") {
       val uuidStr = params("uuid")
+      val accept = request.getHeader("Accept")
+      val (startByte, optEndByte) = translateRangeHeader(request.getHeader("Range"))
       multiParams("splat") match {
         case Seq(path) =>
           ItemId.fromString(s"""$uuidStr/${ path }""")
@@ -79,7 +82,7 @@ trait BagsServletComponent extends DebugEnhancedLogging {
             }
             .flatMap(itemId => {
               debug(s"Retrieving item $itemId")
-              bagStores.copyToStream(itemId, request.header("Accept").flatMap(acceptToArchiveStreamType) , response.outputStream)
+              bagStores.copyToStream(itemId, accept, response.outputStream, None, startByte, optEndByte)
             })
             .map(_ => Ok())
             .getOrRecover {

@@ -90,7 +90,7 @@ class CroppingOutputStreamSpec extends FlatSpec with Matchers {
     output.toString should be ("f")
   }
 
-  "write(Array[Byte],Int,Int)" should "forward call to underlying stream if skipLength == 0 and totalLenght great enough (1)" in {
+  "write(Array[Byte],Int,Int)" should "forward call to underlying stream if skipLength == 0 and totalLength great enough (1)" in {
     val output = new ByteArrayOutputStream()
     val cos = new CroppingOutputStream(output, 0, 100)
     cos.write(alphabetBuffer, 0, 5)
@@ -98,7 +98,7 @@ class CroppingOutputStreamSpec extends FlatSpec with Matchers {
     output.toString should be ("abcde")
   }
 
-  it should "forward call to underlying stream if skipLength == 0 and totalLenght great enough (2)" in {
+  it should "forward call to underlying stream if skipLength == 0 and totalLength great enough (2)" in {
     val output = new ByteArrayOutputStream()
     val cos = new CroppingOutputStream(output, 0, 100)
     cos.write(alphabetBuffer, 2, 5)

@@ -17,6 +17,8 @@ package nl.knaw.dans.easy.bagstore
 
 import java.io.OutputStream
 
+import nl.knaw.dans.lib.logging.DebugEnhancedLogging
+
 /**
  * Wraps another output stream and crops its input. "Cropping" here means cutting off parts of the beginning and/or
  * the end, similar to cropping an image.
@@ -25,7 +27,7 @@ import java.io.OutputStream
  * @param skipLength the number of bytes to cut off the beginning of data
  * @param maxLength maximum length to write before cutting off the end
  */
-class CroppingOutputStream(os: OutputStream, skipLength: Long, maxLength: Long) extends OutputStream {
+class CroppingOutputStream(os: => OutputStream, skipLength: Long, maxLength: Long) extends OutputStream with DebugEnhancedLogging {
   private var received = 0L
   private var written = 0L
 
@@ -38,16 +40,23 @@ class CroppingOutputStream(os: OutputStream, skipLength: Long, maxLength: Long) 
   }
 
   override def write(b: Array[Byte], off: Int, len: Int): Unit = {
+    trace(b.length, off, len)
     // Copied the checks on bounds from java.io.OutputStream
     if (off < 0 || off > b.length || len < 0 || off + len > b.length || off + len < 0) throw new IndexOutOfBoundsException
     val startPosInBufferPart = Math.max(skipLength - received, 0)
     val startPosInBuffer = off + startPosInBufferPart
-    val nBytesToWrite = Math.min(len, Math.min(maxLength - written, b.length - startPosInBuffer + 1))
+    val nBytesToWrite = Math.min(len, Math.min(maxLength - written, b.length - startPosInBuffer))
     if (startPosInBuffer < b.length) {
-      os.write(b, startPosInBuffer.toInt, nBytesToWrite.toInt)
+      debug(s"Writing from input to underlying buffer: start = $startPosInBuffer, len = $nBytesToWrite")
+      try {
+        os.write(b, startPosInBuffer.toInt, nBytesToWrite.toInt)
+      } catch {
+        case e: Exception => debug(s"Exception: $e"); throw e
+      }
       written += nBytesToWrite
     }
     received += len
+    debug(s"received = $received, written = $written")
   }
 
   override def close(): Unit = os.close()

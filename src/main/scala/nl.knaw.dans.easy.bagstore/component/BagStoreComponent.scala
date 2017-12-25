@@ -99,8 +99,8 @@ trait BagStoreComponent {
      * The file and directory permissions on the result are changed recursively to the values configured in
      * `cli.output.bag-file-permissions` and `cli.output.bag-dir-permissions`.
      *
-     * @param itemId the item to copy
-     * @param output the directory to copy it to
+     * @param itemId         the item to copy
+     * @param output         the directory to copy it to
      * @param skipCompletion if `true` no files will be fetched from other locations
      * @return
      */
@@ -152,7 +152,7 @@ trait BagStoreComponent {
      * @return whether the call was successful
      */
     def copyToStream(itemId: ItemId, archiveStreamType: Option[ArchiveStreamType], outputStream: => OutputStream, startByte: Long = 0, endByte: Option[Long] = None): Try[Unit] = {
-      trace(itemId)
+      trace(itemId, archiveStreamType, startByte, endByte)
       val bagId = BagId(itemId.uuid)
 
       fileSystem.checkBagExists(bagId).flatMap { _ =>
@@ -173,11 +173,14 @@ trait BagStoreComponent {
             }
           }
           allEntries <- Try { (dirSpecs ++ fileSpecs).sortBy(_.entryPath) }
-          // TODO: only get subseq for tar, in other cases subseq = allentries
-          range <- Try { TarRange(allEntries, startByte, endByte) }
-          _ <- archiveStreamType.map { st =>
-            debug(s"Writing overlapping entries (offset = ${range.offsetIntoFirstEntry}, totalLength = ${range.totalLength}): ${range.overlappingEntries}")
-            new ArchiveStream(st, range.overlappingEntries).writeTo(new CroppingOutputStream(outputStream, range.offsetIntoFirstEntry, range.totalLength))
+          _ <- archiveStreamType.map {
+            case st @ ArchiveStreamType.TAR =>
+              val range = TarRange(allEntries, startByte, endByte)
+              debug(s"Writing overlapping entries (offset = ${ range.offsetIntoFirstEntry }, totalLength = ${ range.totalLength }): ${ range.overlappingEntries }")
+              new ArchiveStream(st, range.overlappingEntries).writeTo(new CroppingOutputStream(outputStream, range.offsetIntoFirstEntry, range.totalLength))
+            case st =>
+              debug(s"Writing all entries and cropping to range $startByte - $endByte")
+              new ArchiveStream(st, allEntries).writeTo(new CroppingOutputStream(outputStream, startByte, endByte.getOrElse(Long.MaxValue)))
           }.getOrElse {
             if (allEntries.size == 1) Try {
               fileSystem.toRealLocation(fileIds.head)
@@ -186,7 +189,7 @@ trait BagStoreComponent {
                   Files.copy(path, outputStream)
                 })
             }
-            else if(allEntries.isEmpty) Failure(NoSuchItemException(itemId))
+            else if (allEntries.isEmpty) Failure(NoSuchItemException(itemId))
             else Failure(NoRegularFileException(itemId))
           }
         } yield ()

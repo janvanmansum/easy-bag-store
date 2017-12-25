@@ -76,6 +76,8 @@ trait StoresServletComponent extends DebugEnhancedLogging {
       val bagstore = params("bagstore")
       val uuidStr = params("uuid")
       val accept = request.getHeader("Accept")
+      val (startByte, optEndByte) = translateRangeHeader(request.getHeader("Range"))
+
       bagStores.getBaseDirByShortname(bagstore)
         .map(baseDir => ItemId.fromString(uuidStr)
           .recoverWith {
@@ -88,7 +90,7 @@ trait StoresServletComponent extends DebugEnhancedLogging {
               .enumFiles(bagId, includeDirectories = false, Some(baseDir))
               .map(files => Ok(files.toList.mkString("\n")))
             else bagStores
-              .copyToStream(bagId, accept, response.outputStream, Some(baseDir))
+              .copyToStream(bagId, accept, response.outputStream, Some(baseDir), startByte, optEndByte)
               .map(_ => Ok())
           })
           .getOrRecover {
@@ -108,6 +110,8 @@ trait StoresServletComponent extends DebugEnhancedLogging {
     get("/:bagstore/bags/:uuid/*") {
       val bagstore = params("bagstore")
       val uuidStr = params("uuid")
+      val accept = request.getHeader("Accept")
+      val (startByte, optEndByte) = translateRangeHeader(request.getHeader("Range"))
       multiParams("splat") match {
         case Seq(path) =>
           bagStores.getBaseDirByShortname(bagstore)
@@ -117,7 +121,7 @@ trait StoresServletComponent extends DebugEnhancedLogging {
               }
               .flatMap(itemId => {
                 debug(s"Retrieving item $itemId")
-                bagStores.copyToStream(itemId, request.header("Accept").flatMap(acceptToArchiveStreamType), response.outputStream, Some(baseDir))
+                bagStores.copyToStream(itemId, accept, response.outputStream, Some(baseDir), startByte, optEndByte)
               })
               .map(_ => Ok())
               .getOrRecover {
