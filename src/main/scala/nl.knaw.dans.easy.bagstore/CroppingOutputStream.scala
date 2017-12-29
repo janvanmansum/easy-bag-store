@@ -28,6 +28,7 @@ import nl.knaw.dans.lib.logging.DebugEnhancedLogging
  * @param maxLength maximum length to write before cutting off the end
  */
 class CroppingOutputStream(os: => OutputStream, skipLength: Long, maxLength: Long) extends OutputStream with DebugEnhancedLogging {
+  trace(skipLength, maxLength)
   private var received = 0L
   private var written = 0L
 

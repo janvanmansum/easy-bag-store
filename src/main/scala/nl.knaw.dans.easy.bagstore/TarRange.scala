@@ -25,6 +25,7 @@ import scala.util.Try
  * Represents a range in a TAR file.
  */
 case class TarRange(entries: Seq[EntrySpec], startByte: Long, endByte: Option[Long] = None) extends DebugEnhancedLogging {
+  trace(entries, startByte, endByte)
   type Position = Long
   type Length = Long
 

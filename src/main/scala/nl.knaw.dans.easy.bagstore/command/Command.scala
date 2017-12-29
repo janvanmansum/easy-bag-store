@@ -27,6 +27,7 @@ import scala.util.control.NonFatal
 import scala.util.{ Success, Try }
 
 object Command extends App with CommandLineOptionsComponent with ServiceWiring with DebugEnhancedLogging {
+  debug(s"LC_ALL = ${System.getenv("LC_ALL")}")
 
   type FeedBackMessage = String
 

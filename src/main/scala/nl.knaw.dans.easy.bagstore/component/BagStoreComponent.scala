@@ -166,21 +166,21 @@ trait BagStoreComponent {
                 .toRealLocation(fileId)
                 .map(source => createEntrySpec(Some(source), bagDir, itemPath, fileId))
           }.collectResults
-          dirSpecs <- Try {
-            fileIds.filter(_.isDirectory).map {
-              dir =>
-                createEntrySpec(None, bagDir, itemPath, dir)
-            }
-          }
-          allEntries <- Try { (dirSpecs ++ fileSpecs).sortBy(_.entryPath) }
+//          dirSpecs <- Try {
+//            fileIds.filter(_.isDirectory).map {
+//              dir =>
+//                createEntrySpec(None, bagDir, itemPath, dir)
+//            }
+//          }
+          allEntries <- Try { fileSpecs.sortBy(_.entryPath) }
           _ <- archiveStreamType.map {
             case st @ ArchiveStreamType.TAR =>
-              val range = TarRange(allEntries, startByte, endByte)
+              val range = TarRange(allEntries.filter(_.sourcePath.isDefined), startByte, endByte)
               debug(s"Writing overlapping entries (offset = ${ range.offsetIntoFirstEntry }, totalLength = ${ range.totalLength }): ${ range.overlappingEntries }")
               new ArchiveStream(st, range.overlappingEntries).writeTo(new CroppingOutputStream(outputStream, range.offsetIntoFirstEntry, range.totalLength))
             case st =>
               debug(s"Writing all entries and cropping to range $startByte - $endByte")
-              new ArchiveStream(st, allEntries).writeTo(new CroppingOutputStream(outputStream, startByte, endByte.getOrElse(Long.MaxValue)))
+              new ArchiveStream(st, allEntries.filter(_.sourcePath.isDefined)).writeTo(new CroppingOutputStream(outputStream, startByte, endByte.getOrElse(Long.MaxValue - 1) + 1))
           }.getOrElse {
             if (allEntries.size == 1) Try {
               fileSystem.toRealLocation(fileIds.head)
